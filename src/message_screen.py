@@ -36,7 +36,8 @@ class MessageScreen:
         header_str = 'MESSAGE'
         text_color = constants.COLOR_TO_RGB['white']
         self.header_label = label.Label(
-                fonts.font_14pt, 
+                #fonts.font_14pt, 
+                fonts.font_10pt, 
                 text = header_str, 
                 color = text_color, 
                 scale = font_scale,

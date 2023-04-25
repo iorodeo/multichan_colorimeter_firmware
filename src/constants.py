@@ -1,6 +1,5 @@
 import board
 import collections
-import adafruit_tsl2591
 
 __version__ = '0.1.0'
 
@@ -8,10 +7,10 @@ CALIBRATIONS_FILE = 'calibrations.json'
 CONFIGURATION_FILE = 'configuration.json'
 SPLASHSCREEN_BMP = 'assets/splashscreen.bmp'
 
-LOOP_DT = 0.1
-BLANK_DT = 0.05
+LOOP_DT = 0.01
+BLANK_DT = 0.01
 DEBOUNCE_DT = 0.6 
-NUM_BLANK_SAMPLES = 50 
+NUM_BLANK_SAMPLES = 3 
 BATTERY_AIN_PIN = board.A6
 
 BUTTON = { 
@@ -34,22 +33,13 @@ COLOR_TO_RGB = collections.OrderedDict([
     ('blue'   , 0x0000ff),
     ('white'  , 0xffffff), 
     ('orange' , 0xffb447),
+    ('415nm'  , 0x7600ed),
+    ('445nm'  , 0x0028ff),
+    ('480nm'  , 0x00d5ff),
+    ('515nm'  , 0x1fff00),
+    ('555nm'  , 0xb3ff00),
+    ('590nm'  , 0xffdf00),
+    ('630nm'  , 0xff4f00),
+    ('680nm'  , 0xff0000),
     ])
 
-STR_TO_GAIN = collections.OrderedDict([
-        ('low'  , adafruit_tsl2591.GAIN_LOW ),
-        ('med'  , adafruit_tsl2591.GAIN_MED ),
-        ('high' , adafruit_tsl2591.GAIN_HIGH),
-        ('max'  , adafruit_tsl2591.GAIN_MAX ),
-        ])
-GAIN_TO_STR = {v:k for k,v in STR_TO_GAIN.items()}
-
-STR_TO_INTEGRATION_TIME = collections.OrderedDict([
-        ('100ms', adafruit_tsl2591.INTEGRATIONTIME_100MS),
-        ('200ms', adafruit_tsl2591.INTEGRATIONTIME_200MS),
-        ('300ms', adafruit_tsl2591.INTEGRATIONTIME_300MS),
-        ('400ms', adafruit_tsl2591.INTEGRATIONTIME_400MS),
-        ('500ms', adafruit_tsl2591.INTEGRATIONTIME_500MS),
-        ('600ms', adafruit_tsl2591.INTEGRATIONTIME_600MS),
-        ])
-INTEGRATION_TIME_TO_STR = {v:k for k,v in STR_TO_INTEGRATION_TIME.items()}

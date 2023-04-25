@@ -1,5 +1,7 @@
+import gc
 import time
 import ulab
+import busio
 import board
 import analogio
 import digitalio
@@ -7,9 +9,9 @@ import gamepadshift
 import constants
 import adafruit_itertools
 
-from light_sensor import LightSensor
 from light_sensor import LightSensorOverflow
 from light_sensor import LightSensorIOError
+from light_sensor import MultiChanLightSensor
 
 from battery_monitor import BatteryMonitor
 
@@ -29,6 +31,10 @@ class Mode:
     MESSAGE = 2
     ABORT   = 3
 
+class DisplayMode:
+    TEXT = 0
+    BARS = 1
+
 class Colorimeter:
 
     ABOUT_STR = 'About'
@@ -39,13 +45,17 @@ class Colorimeter:
 
     def __init__(self):
 
+        self.i2c = busio.I2C(board.SCL, board.SDA)
+
         self.menu_items = list(self.DEFAULT_MEASUREMENTS)
         self.menu_view_pos = 0
         self.menu_item_pos = 0
         self.mode = Mode.MEASURE
+        self.blank_values = ulab.numpy.ones((MultiChanLightSensor.NUM_CHAN,))
         self.is_blanked = False
-        self.blank_value = 1.0
-
+        #self.measurement_name = self.TRANSMITTANCE_STR
+        self.measurement_name = self.RAW_SENSOR_STR
+        self.display_mode = DisplayMode.TEXT
 
         # Create screens
         board.DISPLAY.brightness = 1.0
@@ -73,65 +83,21 @@ class Colorimeter:
 
         # Load calibrations and populate menu items
         self.calibrations = Calibrations()
+
+        # Setup multi-channel light sensor
         try:
-            self.calibrations.load()
-        except CalibrationsError as error: 
-            # Unable to load calibrations file or not a dict after loading
-            self.message_screen.set_message(error) 
-            self.message_screen.set_to_error()
-            self.mode = Mode.MESSAGE
-        else:
-            # We can load calibration, but detected errors in some calibrations
-            if self.calibrations.has_errors:
-                error_msg = f'errors found in calibrations file'
-                self.message_screen.set_message(error_msg)
-                self.message_screen.set_to_error()
-                self.mode = Mode.MESSAGE
-
-        self.menu_items.extend([k for k in self.calibrations.data])
-        self.menu_items.append(self.ABOUT_STR)
-
-        # Set default/startup measurement
-        if self.configuration.startup in self.menu_items:
-            self.measurement_name = self.configuration.startup
-        else:
-            if self.configuration.startup is not None:
-                error_msg = f'startup measurement {self.configuration.startup} not found'
-                self.message_screen.set_message(error_msg)
-                self.message_screen.set_to_error()
-                self.mode = Mode.MESSAGE
-            self.measurement_name = self.menu_items[0] 
-
-        # Setup light sensor and preliminary blanking 
-        try:
-            self.light_sensor = LightSensor()
+            self.mc_light_sensor = MultiChanLightSensor(self.i2c)
         except LightSensorIOError as error:
             error_msg = f'missing sensor? {error}'
             self.message_screen.set_message(error_msg,ok_to_continue=False)
             self.message_screen.set_to_abort()
             self.mode = Mode.ABORT
         else:
-            if self.configuration.gain is not None:
-                self.light_sensor.gain = self.configuration.gain
-            if self.configuration.integration_time is not None:
-                self.light_sensor.integration_time = self.configuration.integration_time
             self.blank_sensor(set_blanked=False)
             self.measure_screen.set_not_blanked()
 
         # Setup up battery monitoring settings cycles 
         self.battery_monitor = BatteryMonitor()
-        self.setup_gain_and_itime_cycles()
-
-    def setup_gain_and_itime_cycles(self):
-        self.gain_cycle = adafruit_itertools.cycle(constants.GAIN_TO_STR) 
-        if self.configuration.gain is not None:
-            while next(self.gain_cycle) != self.configuration.gain: 
-                continue
-
-        self.itime_cycle = adafruit_itertools.cycle(constants.INTEGRATION_TIME_TO_STR)
-        if self.configuration.integration_time is not None:
-            while next(self.itime_cycle) != self.configuration.integration_time:
-                continue
 
     @property
     def num_menu_items(self):
@@ -186,28 +152,31 @@ class Colorimeter:
         return units
 
     @property
-    def raw_sensor_value(self):
-        return self.light_sensor.value
+    def raw_sensor_values(self):
+        return self.mc_light_sensor.values
 
     @property
-    def transmittance(self):
-        transmittance = float(self.raw_sensor_value)/self.blank_value
-        return transmittance
+    def transmittances(self):
+        transmittances = self.raw_sensor_values/self.blank_values
+        mask = transmittances > 1.0
+        transmittances[mask] = 1.0
+        return transmittances
 
     @property
-    def absorbance(self):
-        absorbance = -ulab.numpy.log10(self.transmittance)
-        absorbance = absorbance if absorbance > 0.0 else 0.0
-        return absorbance
+    def absorbances(self):
+        absorbances = -ulab.numpy.log10(self.transmittances)
+        mask = absorbances < 0.0
+        absorbances[mask] = 0.0
+        return absorbances
 
     @property
-    def measurement_value(self):
+    def measurement_values(self):
         if self.is_absorbance: 
-            value = self.absorbance
+            values = self.absorbances
         elif self.is_transmittance:
-            value = self.transmittance
+            values = self.transmittances
         elif self.is_raw_sensor:
-            value = self.raw_sensor_value
+            values = self.raw_sensor_values
         else:
             try:
                 value = self.calibrations.apply( 
@@ -219,18 +188,17 @@ class Colorimeter:
                 self.message_screen.set_to_error()
                 self.measurement_name = 'Absorbance'
                 self.mode = Mode.MESSAGE
-        return value
+        return values
 
     def blank_sensor(self, set_blanked=True):
-        blank_samples = ulab.numpy.zeros((constants.NUM_BLANK_SAMPLES,))
-        for i in range(constants.NUM_BLANK_SAMPLES):
-            try:
-                value = self.raw_sensor_value
-            except LightSensorOverflow:
-                value = self.light_sensor.max_counts
-            blank_samples[i] = value
+        num_chan = self.mc_light_sensor.NUM_CHAN
+        num_samp = constants.NUM_BLANK_SAMPLES
+        blank_samples = ulab.numpy.zeros((num_samp,num_chan))
+        for i in range(num_samp):
+            values = self.mc_light_sensor.values
+            blank_samples[i,:] = self.mc_light_sensor.values 
             time.sleep(constants.BLANK_DT)
-        self.blank_value = ulab.numpy.median(blank_samples)
+        self.blank_values = ulab.numpy.median(blank_samples,axis=0)
         if set_blanked:
             self.is_blanked = True
 
@@ -252,20 +220,9 @@ class Colorimeter:
     def right_button_pressed(self, buttons):
         return buttons & constants.BUTTON['right']
 
-    def gain_button_pressed(self, buttons):
-        if self.is_raw_sensor:
-            return buttons & constants.BUTTON['gain']
-        else:
-            return False
-
-    def itime_button_pressed(self, buttons):
-        if self.is_raw_sensor:
-            return buttons & constants.BUTTON['itime']
-        else:
-            return False
-
     def handle_button_press(self):
         buttons = self.pad.get_pressed()
+        #print(buttons)
         if not buttons:
             # No buttons pressed
             return 
@@ -287,12 +244,6 @@ class Colorimeter:
                 self.menu_view_pos = 0
                 self.menu_item_pos = 0
                 self.update_menu_screen()
-            elif self.gain_button_pressed(buttons):
-                self.light_sensor.gain = next(self.gain_cycle)
-                self.is_blanked = False
-            elif self.itime_button_pressed(buttons):
-                self.light_sensor.integration_time = next(self.itime_cycle)
-                self.is_blanked = False
 
         elif self.mode == Mode.MENU:
             if self.menu_button_pressed(buttons):
@@ -333,6 +284,8 @@ class Colorimeter:
 
         while True:
 
+            gc.collect()
+
             # Deal with any button presses
             self.handle_button_press()
 
@@ -344,7 +297,8 @@ class Colorimeter:
                     self.measure_screen.set_measurement(
                             self.measurement_name, 
                             self.measurement_units, 
-                            self.measurement_value
+                            self.measurement_values,
+                            self.mc_light_sensor.CHANNEL_NAMES
                             )
                 except LightSensorOverflow:
                     self.measure_screen.set_overflow(self.measurement_name)
@@ -353,17 +307,11 @@ class Colorimeter:
                 # when device is displaying raw sensor data
                 if self.is_raw_sensor:
                     self.measure_screen.set_blanked()
-                    gain = self.light_sensor.gain
-                    itime = self.light_sensor.integration_time
-                    self.measure_screen.set_gain(gain)
-                    self.measure_screen.set_integration_time(itime)
                 else:
                     if self.is_blanked:
                         self.measure_screen.set_blanked()
                     else:
                         self.measure_screen.set_not_blanked()
-                    self.measure_screen.clear_gain()
-                    self.measure_screen.clear_integration_time()
 
                 # Update and display measurement of battery voltage
                 self.battery_monitor.update()

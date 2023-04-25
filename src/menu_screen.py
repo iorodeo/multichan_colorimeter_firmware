@@ -33,7 +33,8 @@ class MenuScreen:
         # Create header text label
         header_str = 'Menu'
         self.header_label = label.Label(
-                fonts.font_14pt, 
+                #fonts.font_14pt, 
+                fonts.font_10pt, 
                 text = header_str, 
                 color = constants.COLOR_TO_RGB['white'], 
                 scale = font_scale,
