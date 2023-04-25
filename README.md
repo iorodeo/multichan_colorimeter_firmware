@@ -1,11 +1,11 @@
-# Multi-channel Open Colorimeter Firmware (prototype) 
+## Multi-channel Open Colorimeter Firmware (prototype) 
 
 ![alt text](/images/open_colorimeter.png)
 
-Firmware (circuitpython) for the open colorimeter with the AS734110-Channel
+Firmware (circuitpython) for the open colorimeter with the AS7341 10-Channel
 Light/Color Sensor. 
 
-## Requirements 
+### Requirements 
 
 * circuitpython >= 7.32
 * adafruit_bitmap_font
@@ -15,7 +15,7 @@ Light/Color Sensor.
 * adafruit_as7341
 * adafruit_register
 
-## Installation
+### Installation
 
 * Copy the code.py and all the .py files in src file to the CIRCUITPY drive associated with
 your feather development board. 
