@@ -37,7 +37,7 @@ class MessageScreen:
         text_color = constants.COLOR_TO_RGB['white']
         self.header_label = label.Label(
                 #fonts.font_14pt, 
-                fonts.font_10pt, 
+                fonts.font_8pt, 
                 text = header_str, 
                 color = text_color, 
                 scale = font_scale,
@@ -53,9 +53,10 @@ class MessageScreen:
         message_label_y = header_label_y + self.SPACING_MESSAGE_LABEL
         for i in range(self.NUM_MESSAGE_LABEL): 
             message_str = ' '*self.MESSAGE_MAX_CHARS
-            text_color = constants.COLOR_TO_RGB['orange']
+            text_color = constants.COLOR_TO_RGB['yellow']
             message_label = label.Label(
-                    fonts.font_10pt, 
+                    #fonts.font_10pt, 
+                    fonts.font_8pt, 
                     text = message_str, 
                     color = text_color, 
                     scale = font_scale,

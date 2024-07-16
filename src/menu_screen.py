@@ -34,7 +34,8 @@ class MenuScreen:
         header_str = 'Menu'
         self.header_label = label.Label(
                 #fonts.font_14pt, 
-                fonts.font_10pt, 
+                #fonts.font_10pt, 
+                fonts.font_8pt, 
                 text = header_str, 
                 color = constants.COLOR_TO_RGB['white'], 
                 scale = font_scale,
@@ -59,7 +60,12 @@ class MenuScreen:
 
         # Test populate some items
         vert_pix_remaining = board.DISPLAY.height - (menu_line_y1 + 1)
-        test_label = label.Label(fonts.font_10pt, text='test',scale=font_scale)
+        test_label = label.Label(
+                #fonts.font_10pt, 
+                fonts.font_8pt, 
+                text='test',
+                scale=font_scale
+                )
         label_dy = test_label.bounding_box[3] + self.PADDING_ITEM
         self.items_per_screen = vert_pix_remaining//label_dy
 
@@ -68,7 +74,8 @@ class MenuScreen:
             pos_x = 2
             pos_y = menu_line_y0 + (i+1)*label_dy 
             label_tmp = label.Label(
-                     fonts.font_10pt,
+                    #fonts.font_10pt,
+                     fonts.font_8pt,
                      text = '',
                      color = constants.COLOR_TO_RGB['white'],
                      scale = font_scale,
@@ -95,7 +102,7 @@ class MenuScreen:
         for i, item_label in enumerate(self.item_labels):
             if i==num:
                 item_label.color = constants.COLOR_TO_RGB['black']
-                item_label.background_color = constants.COLOR_TO_RGB['orange']
+                item_label.background_color = constants.COLOR_TO_RGB['yellow']
             else:
                 item_label.color = constants.COLOR_TO_RGB['white']
                 item_label.background_color = constants.COLOR_TO_RGB['black']

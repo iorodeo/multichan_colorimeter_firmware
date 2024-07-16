@@ -24,6 +24,7 @@ class Calibrations(JsonSettingsFile):
             error_list = []
             error_list.extend(self.check_fit(name, calibration))
             error_list.extend(self.check_range(name, calibration))
+            error_list.extend(self.check_channel(name, calibration))
             if error_list:
                 self.error_dict[name] = error_list
 
@@ -31,7 +32,7 @@ class Calibrations(JsonSettingsFile):
         for name in self.error_dict:
             del self.data[name]
 
-    def check_fit(self,name, calibration): 
+    def check_fit(self, name, calibration): 
         error_list = []
         try:
             fit_type = calibration['fit_type']
@@ -101,6 +102,19 @@ class Calibrations(JsonSettingsFile):
 
         return error_list
 
+    def check_channel(self, name, calibration):
+        error_list = []
+        try:
+            channel = calibration['channel']
+        except KeyError:
+            # OK not to specify channel as it is optional
+            pass
+        else:
+            if not channel in range(0,constants.NUM_CHANNEL):
+                error_msg = f'channel {channel} not allowed'
+                error_list.append(error_msg)
+        return error_list
+
     def led(self, name):
         try:
             led = self.data[name]['led']
@@ -114,6 +128,14 @@ class Calibrations(JsonSettingsFile):
         except KeyError:
             units = None
         return units
+
+    def channel(self, name): 
+        try:
+            data = self.data[name]
+        except KeyError:
+            return None
+        else:
+            return data.get('channel', None)
 
     def apply(self, name, absorbance):
         fit_type = self.data[name]['fit_type']

@@ -1,32 +1,37 @@
+import busio
+import board
+import constants
 import adafruit_as7341
 import ulab
 from collections import OrderedDict
 
-class MultiChanLightSensor:
+class LightSensor:
 
     NUM_CHAN = 10
-    DEFAULT_GAIN = adafruit_as7341.Gain.GAIN_16X
-    #DEFAULT_GAIN = adafruit_as7341.Gain.GAIN_32X
-    #DEFAULT_GAIN = adafruit_as7341.Gain.GAIN_64X
-    #DEFAULT_GAIN = adafruit_as7341.Gain.GAIN_128X
-    CHANNEL_NAMES = [
-            '415nm',  # chan 1
-            '445nm',  # chan 2
-            '480nm',  # chan 3
-            '515nm',  # chan 4
-            '555nm',  # chan 5
-            '590nm',  # chan 6
-            '630nm',  # chan 7
-            '680nm',  # chan 8
-            '910nm',  # chan 9 
-            'clear',  # chan 10 
-            ]
-    def __init__(self,i2c):
+    DEFAULT_GAIN = constants.STR_TO_GAIN['16x']
+    CHANNEL_NAMES = [k for k in constants.STR_TO_CHANNEL]
+    AS7341_MAX_COUNT = 2**16-1
+
+    def __init__(self):
+        i2c = busio.I2C(board.SCL, board.SDA)
         try:
             self._device = adafruit_as7341.AS7341(i2c)
         except ValueError as error:
             raise LightSensorIOError(error)
-        self._device.gain = self.DEFAULT_GAIN
+        self.gain = self.DEFAULT_GAIN
+
+    @property 
+    def max_counts(self):
+        return self.AS7341_MAX_COUNT
+
+    @property
+    def gain(self):
+        return self._gain
+
+    @gain.setter
+    def gain(self, value):
+        self._gain = value
+        self._device.gain = value
 
     @property
     def values_as_dict(self):
@@ -37,14 +42,20 @@ class MultiChanLightSensor:
         return values_dict
 
     @property
-    def values(self):
-        values = ulab.numpy.zeros((10,))
-        all_chans = self._device.all_channels
-        for i in range(8):
-            values[i] = all_chans[i]
-        values[8] = self._device.channel_nir
-        values[9] = self._device.channel_clear
+    def raw_values(self):
+        values = list(self._device.all_channels)
+        values.append(self._device.channel_nir)
+        values.append(self._device.channel_clear)
         return values
+
+    def raw_channel(self, channel):
+        if channel >= constants.NUM_CHANNEL:
+            raise ValueError('channel out of range') 
+        value = self.raw_values[channel]
+        if value >= self.max_counts:
+            raise LightSensorOverflow('light sensor reading > max_counts')
+        return value
+
 
 
 class LightSensorOverflow(Exception):
