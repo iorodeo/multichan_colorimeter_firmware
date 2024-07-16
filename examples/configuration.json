@@ -1,5 +1,4 @@
 {
-  "gain" : "med",
-  "integration_time" : "500ms",
-  "startup" : "Absorbance"
+  "gain" : "16x",
+  "startup" : "Absorbance",
 } 
