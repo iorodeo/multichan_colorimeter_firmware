@@ -24,6 +24,9 @@ from menu_screen import MenuScreen
 from message_screen import MessageScreen
 from multi_measure_screen import MultiMeasureScreen
 
+from messaging import MessageReceiver
+from messaging import send_message
+
 class Mode:
     MEASURE = 0
     MENU    = 1
@@ -51,6 +54,7 @@ class Colorimeter:
         self.menu_item_pos = 0
         self.is_blanked = False
         self.blank_values = ulab.numpy.ones((constants.NUM_CHANNEL,)) 
+
 
 
         # Setup gamepad inputs - change this (Keypad shift??)
@@ -118,6 +122,9 @@ class Colorimeter:
         # Setup up battery monitoring settings cycles 
         self.battery_monitor = BatteryMonitor()
         self.setup_menu_cycles()
+
+        # Setup message receiver
+        self.message_receiver = MessageReceiver()
 
     def setup_menu_cycles(self):
         self.gain_cycle = adafruit_itertools.cycle(constants.GAIN_TO_STR) 
@@ -368,9 +375,31 @@ class Colorimeter:
         else:
             return True
 
+    def handle_serial_command(self): 
+        msg = self.message_receiver.update()
+        if msg:
+            try:
+                cmd = msg['command']
+            except KeyError:
+                rsp = {'command': 'missing'}
+            else:
+                rsp = {'command': cmd, 'response': {}}
+                if cmd == 'read':
+                    rsp['response']['values'] = self.light_sensor.values_as_dict
+                    if self.is_blanked:
+                        rsp['response']['blanks'] = {}
+                        for name, chan in constants.STR_TO_CHANNEL.items():
+                            rsp['response']['blanks'][name] = self.blank_values[chan]
+                else:
+                    rsp['response']['error'] = 'unknown command'
+            send_message(rsp)
+
     def run(self):
 
         while True:
+            # Deal with any incomming serial commands
+            self.handle_serial_command()
+
             # Deal with any button presses
             self.handle_button_press()
 

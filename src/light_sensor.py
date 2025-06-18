@@ -36,7 +36,7 @@ class LightSensor:
     @property
     def values_as_dict(self):
         values_dict = OrderedDict()
-        values = self.values
+        values = self.raw_values
         for name, value in zip(self.CHANNEL_NAMES, values):
             values_dict[name] = value
         return values_dict
